@@ -18,34 +18,23 @@ const { ROOT, validateConfig } = require('../src/lib/config.cjs');
 test('demo snapshot passes the public schema', () => {
   const snapshot = demoSnapshot();
   assert.doesNotThrow(() => validateSnapshot(snapshot));
-  assert.equal(snapshot.weather.place, '示例城市');
   assert.equal(snapshot.sources.deepseek.balance, 12.34);
 });
 
 test('last known good data is preserved only for enabled failing providers', () => {
   const previous = demoSnapshot();
   const next = demoSnapshot();
-  next.sources.claude = {
+  next.sources.codex = {
     ok: false,
-    label: 'Claude',
+    label: 'Codex',
     windows: [],
     fetchedAt: next.updatedAt,
     error: '临时失败',
   };
-  next.sources.kimi = {
-    ok: false,
-    label: 'Kimi',
-    windows: [],
-    fetchedAt: next.updatedAt,
-    error: '未启用',
-    disabled: true,
-  };
   preserveLastKnownGood(next, previous);
-  assert.equal(next.sources.claude.ok, true);
-  assert.equal(next.sources.claude.stale, true);
-  assert.equal(next.sources.claude.error, '临时失败');
-  assert.equal(next.sources.kimi.ok, false);
-  assert.equal(next.sources.kimi.disabled, true);
+  assert.equal(next.sources.codex.ok, true);
+  assert.equal(next.sources.codex.stale, true);
+  assert.equal(next.sources.codex.error, '临时失败');
 });
 
 test('safeError removes obvious credential material', () => {

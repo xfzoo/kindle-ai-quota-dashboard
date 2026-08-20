@@ -11,11 +11,13 @@ function readCodexRateLimits(executable, timeoutMs = 20_000) {
   return new Promise((resolve, reject) => {
     const child = spawn(executable, ['app-server', '--listen', 'stdio://'], {
       windowsHide: true,
+      shell: process.platform === 'win32' && /\.(cmd|bat|ps1)$/i.test(executable),
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
     });
     let stdout = '';
     let stderr = '';
+    let ratePayload = {};
     let settled = false;
     const timeout = setTimeout(() => finish(new Error('Codex app-server 查询超时')), timeoutMs);
 
@@ -54,7 +56,13 @@ function readCodexRateLimits(executable, timeoutMs = 20_000) {
           send({ method: 'account/rateLimits/read', id: 2, params: null });
         } else if (message.id === 2) {
           if (message.error) return finish(new Error(message.error.message || 'Codex 额度查询失败'));
-          return finish(null, message.result || {});
+          ratePayload = message.result || {};
+          send({ method: 'account/usage/read', id: 3, params: null });
+        } else if (message.id === 3) {
+          return finish(null, {
+            rateLimits: ratePayload,
+            usage: normalizeUsage(message.error ? {} : (message.result || {})),
+          });
         }
       }
     });
@@ -83,6 +91,18 @@ function durationName(minutes, fallback) {
   return fallback;
 }
 
+function normalizeUsage(payload) {
+  const raw = payload && (payload.usage || payload);
+  const buckets = raw && (raw.dailyUsageBuckets || raw.daily_usage_buckets || raw.buckets);
+  if (!Array.isArray(buckets)) return { daily: [] };
+  return {
+    daily: buckets.map((item) => ({
+      date: String(item.startDate || item.start_date || item.date || '').slice(0, 10),
+      tokens: Number(item.tokens || item.totalTokens || item.total_tokens || 0),
+    })).filter((item) => item.date && Number.isFinite(item.tokens)),
+  };
+}
+
 async function collectCodex(config = {}) {
   const fetchedAt = isoBeijing();
   if (!config.enabled) {
@@ -94,7 +114,8 @@ async function collectCodex(config = {}) {
   const envName = String(config.executableEnv || 'CODEX_CLI_PATH');
   const executable = String(process.env[envName] || config.executable || 'codex').trim();
   try {
-    const payload = await readCodexRateLimits(executable, Number(config.timeoutMs || 20_000));
+    const response = await readCodexRateLimits(executable, Number(config.timeoutMs || 20_000));
+    const payload = response.rateLimits || {};
     const byId = payload && payload.rateLimitsByLimitId;
     const bucket = byId && (byId.codex || Object.values(byId)[0]) || payload.rateLimits;
     if (!bucket) throw new Error('Codex 响应中没有 rateLimits');
@@ -111,7 +132,7 @@ async function collectCodex(config = {}) {
       });
     }
     if (!windows.length) throw new Error('Codex 响应中没有可识别的额度窗口');
-    return { ok: true, label: 'Codex', windows, fetchedAt, error: null };
+    return { ok: true, label: 'Codex', windows, usage: response.usage, fetchedAt, error: null };
   } catch (error) {
     return failedWindows('Codex', error, fetchedAt);
   }

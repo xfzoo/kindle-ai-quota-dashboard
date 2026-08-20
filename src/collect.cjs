@@ -2,10 +2,8 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { collectClaude } = require('./collectors/claude.cjs');
 const { collectCodex } = require('./collectors/codex.cjs');
 const { collectDeepSeek } = require('./collectors/deepseek.cjs');
-const { collectKimi } = require('./collectors/kimi.cjs');
 const { ROOT, loadConfig } = require('./lib/config.cjs');
 const {
   isoBeijing,
@@ -14,7 +12,7 @@ const {
   writeAtomic,
 } = require('./lib/common.cjs');
 
-const SOURCE_NAMES = ['claude', 'codex', 'kimi', 'deepseek'];
+const SOURCE_NAMES = ['codex', 'deepseek'];
 
 function readQuote(filePath) {
   if (!filePath) return null;
@@ -87,49 +85,12 @@ function demoSnapshot() {
   const afterHours = (hours) => isoBeijing(Date.now() + hours * 60 * 60 * 1000);
   return {
     updatedAt: now,
-    weather: {
-      ok: true,
-      description: '晴',
-      iconKey: 'clear',
-      tempC: 26,
-      feelsLikeC: 28,
-      humidity: 55,
-      windKph: 8,
-      windDir: '东南风',
-      place: '示例城市',
-      observedAt: now,
-      fetchedAt: now,
-      error: null,
-    },
-    quote: {
-      text: '把无人走过的路，踩成后来人的近路。',
-      source: '开源演示',
-    },
     sources: {
-      claude: {
-        ok: true,
-        label: 'Claude',
-        windows: [
-          { name: '5小时', usedPct: 23, resetAt: afterHours(3) },
-          { name: '7天', usedPct: 42, resetAt: afterHours(96) },
-        ],
-        fetchedAt: now,
-        error: null,
-      },
       codex: {
         ok: true,
         label: 'Codex',
         windows: [{ name: '周', usedPct: 18, resetAt: afterHours(120) }],
-        fetchedAt: now,
-        error: null,
-      },
-      kimi: {
-        ok: true,
-        label: 'Kimi',
-        windows: [
-          { name: '5小时', usedPct: 35, resetAt: afterHours(4) },
-          { name: '周', usedPct: 56, resetAt: afterHours(72) },
-        ],
+        usage: { daily: [{ date: now.slice(0, 10), tokens: 12800 }] },
         fetchedAt: now,
         error: null,
       },
@@ -139,6 +100,7 @@ function demoSnapshot() {
         balance: 12.34,
         currency: 'CNY',
         detail: '余额 ¥12.34',
+        usage: { daily: [{ date: now.slice(0, 10), tokens: 6400 }] },
         fetchedAt: now,
         error: null,
       },
@@ -148,17 +110,13 @@ function demoSnapshot() {
 
 async function realSnapshot(config) {
   const providers = config.providers || {};
-  const [claude, codex, kimi, deepseek] = await Promise.all([
-    collectClaude(providers.claude),
+  const [codex, deepseek] = await Promise.all([
     collectCodex(providers.codex),
-    collectKimi(providers.kimi),
     collectDeepSeek(providers.deepseek),
   ]);
   return {
     updatedAt: isoBeijing(),
-    weather: readWeather(config.weatherFile),
-    quote: readQuote(config.quoteFile),
-    sources: { claude, codex, kimi, deepseek },
+    sources: { codex, deepseek },
   };
 }
 
@@ -186,12 +144,28 @@ function preserveLastKnownGood(snapshot, previous) {
   return snapshot;
 }
 
+function mergeUsageHistory(snapshot, previous) {
+  const history = previous && previous.usageHistory ? previous.usageHistory : {};
+  snapshot.usageHistory = {};
+  for (const name of SOURCE_NAMES) {
+    const merged = new Map();
+    for (const item of Array.isArray(history[name]) ? history[name] : []) {
+      if (item && item.date) merged.set(String(item.date), Number(item.tokens || 0));
+    }
+    const current = snapshot.sources[name] && snapshot.sources[name].usage;
+    for (const item of current && Array.isArray(current.daily) ? current.daily : []) {
+      if (item && item.date) merged.set(String(item.date), Number(item.tokens || 0));
+    }
+    snapshot.usageHistory[name] = Array.from(merged.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-5)
+      .map(([date, tokens]) => ({ date, tokens }));
+  }
+}
+
 function validateSnapshot(snapshot) {
   if (!snapshot || typeof snapshot.updatedAt !== 'string' || !snapshot.sources) {
     throw new Error('快照缺少 updatedAt 或 sources');
-  }
-  if (!snapshot.weather || typeof snapshot.weather.ok !== 'boolean') {
-    throw new Error('快照缺少 weather');
   }
   for (const name of SOURCE_NAMES) {
     const source = snapshot.sources[name];
@@ -232,6 +206,7 @@ async function main() {
   const previous = demo ? null : previousSnapshot(config.outputDir);
   const fresh = demo ? demoSnapshot() : await realSnapshot(config);
   const snapshot = preserveLastKnownGood(fresh, previous);
+  mergeUsageHistory(snapshot, previous);
   validateSnapshot(snapshot);
   writeSnapshot(snapshot, config.outputDir, config.keepLocalHistory === true);
   const status = SOURCE_NAMES

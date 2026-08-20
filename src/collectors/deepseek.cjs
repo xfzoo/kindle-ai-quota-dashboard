@@ -1,11 +1,27 @@
 'use strict';
 
+const fs = require('node:fs');
+
 const {
   failedBalance,
   fetchJson,
   isoBeijing,
   round1,
 } = require('../lib/common.cjs');
+
+function readUsageFile(filePath) {
+  if (!filePath) return { daily: [] };
+  try {
+    const payload = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const rows = Array.isArray(payload) ? payload : payload.daily || payload.usage || [];
+    return { daily: rows.map((item) => ({
+      date: String(item.date || item.day || item.startDate || '').slice(0, 10),
+      tokens: Number(item.tokens || item.total_tokens || item.totalTokens || 0),
+    })).filter((item) => item.date && Number.isFinite(item.tokens)) };
+  } catch {
+    return { daily: [] };
+  }
+}
 
 async function collectDeepSeek(config = {}) {
   const fetchedAt = isoBeijing();
@@ -30,6 +46,7 @@ async function collectDeepSeek(config = {}) {
       balance: round1(balance * 100) / 100,
       currency,
       detail: `余额 ${currency === 'CNY' ? '¥' : `${currency} `}${balance.toFixed(2)}`,
+      usage: readUsageFile(config.usageFile),
       fetchedAt,
       error: null,
     };

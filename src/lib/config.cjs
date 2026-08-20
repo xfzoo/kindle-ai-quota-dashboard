@@ -36,9 +36,15 @@ function loadConfig(configPath = process.env.KINDLE_QUOTA_CONFIG) {
     rootDir: ROOT,
     configPath: filePath,
     outputDir: resolveFromRoot(config.outputDir, 'state'),
-    quoteFile: config.quoteFile ? resolveFromRoot(config.quoteFile) : '',
-    weatherFile: config.weatherFile ? resolveFromRoot(config.weatherFile) : '',
-    providers: config.providers || {},
+    providers: {
+      ...config.providers,
+      deepseek: {
+        ...(config.providers || {}).deepseek,
+        usageFile: config.providers && config.providers.deepseek && config.providers.deepseek.usageFile
+          ? resolveFromRoot(config.providers.deepseek.usageFile)
+          : '',
+      },
+    },
   };
 }
 

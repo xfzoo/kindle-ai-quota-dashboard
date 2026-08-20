@@ -2,6 +2,49 @@
 
 URL="$1"
 [ -n "$URL" ] || exit 1
+echo "url=$URL"
+if [ ! -x /usr/bin/chromium/bin/kindle_browser ]; then
+  echo "kindle_browser missing"
+  echo "uname=$(uname -a 2>&1)"
+  echo "version=$(cat /etc/version 2>&1)"
+  for candidate in /usr/bin/kindle_browser /usr/bin/chromium /usr/bin/chromium/bin/kindle_browser /usr/bin/mesquite /usr/bin/webkit /usr/local/bin/kindle_browser; do
+    ls -l "$candidate" 2>&1
+  done
+  ls -l /usr/bin 2>&1 | grep -Ei 'browser|chrome|chromium|webkit|mesquite' || true
+  restore_native() {
+    lipc-set-prop com.lab126.powerd preventScreenSaver 0 >/dev/null 2>&1 || true
+    if [ -d /etc/upstart ]; then
+      status lab126_gui 2>/dev/null | grep -q running || start lab126_gui >/dev/null 2>&1 || true
+      usleep 1250000
+    else
+      /etc/init.d/framework start >/dev/null 2>&1 || true
+    fi
+    lipc-set-prop com.lab126.appmgrd start app://com.lab126.booklet.home >/dev/null 2>&1 || true
+    eips -c >/dev/null 2>&1 || true
+  }
+  refresh_native() { eips -c >/dev/null 2>&1 || true; eips -c >/dev/null 2>&1 || true; }
+  refresh_native
+  if [ -d /etc/upstart ]; then
+    trap '' TERM
+    stop lab126_gui >/dev/null 2>&1 || true
+    usleep 1250000
+    trap restore_native EXIT INT TERM
+  else
+    /etc/init.d/framework stop >/dev/null 2>&1 || true
+    trap restore_native EXIT INT TERM
+  fi
+  refresh_native
+  trap restore_native EXIT INT TERM
+  lipc-set-prop com.lab126.powerd preventScreenSaver 1 >/dev/null 2>&1 || true
+  echo "starting native browser"
+  lipc-set-prop com.lab126.appmgrd start app://com.lab126.browser 2>&1 || true
+  sleep 3
+  lipc-set-prop com.lab126.appmgrd start "app://com.lab126.browser#going?url=$URL" 2>&1 || true
+  lipc-set-prop com.lab126.browser gotoURL "$URL" 2>&1 || true
+  echo "native browser requested"
+  lipc-wait-event com.lab126.powerd PowerButtonQuickPress 2>&1 || true
+  exit 0
+fi
 
 refresh_screen() {
   eips -c >/dev/null 2>&1
@@ -48,6 +91,7 @@ nohup /usr/bin/chromium/bin/kindle_browser "$URL" --no-zygote --no-sandbox --sin
   >/dev/null 2>&1 &
 
 browser_pid=$!
+echo "browser_pid=$browser_pid"
 unset LD_LIBRARY_PATH
 STOP_FLAG="/tmp/kindle-ai-quota-stop.$$"
 rm -f "$STOP_FLAG"

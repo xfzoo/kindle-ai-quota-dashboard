@@ -147,6 +147,8 @@ function preserveLastKnownGood(snapshot, previous) {
 function mergeUsageHistory(snapshot, previous) {
   const history = previous && previous.usageHistory ? previous.usageHistory : {};
   snapshot.usageHistory = {};
+  const anchor = String(snapshot.updatedAt).slice(0, 10);
+  const anchorMs = Date.parse(`${anchor}T00:00:00Z`);
   for (const name of SOURCE_NAMES) {
     const merged = new Map();
     for (const item of Array.isArray(history[name]) ? history[name] : []) {
@@ -156,10 +158,15 @@ function mergeUsageHistory(snapshot, previous) {
     for (const item of current && Array.isArray(current.daily) ? current.daily : []) {
       if (item && item.date) merged.set(String(item.date), Number(item.tokens || 0));
     }
-    snapshot.usageHistory[name] = Array.from(merged.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-5)
-      .map(([date, tokens]) => ({ date, tokens }));
+    // Always render the last five calendar days.  The Codex API may omit
+    // zero-use days (and may lag by a day), so missing dates must be explicit
+    // zeros instead of silently shifting the chart window.
+    const days = [];
+    for (let offset = 4; offset >= 0; offset -= 1) {
+      const date = new Date(anchorMs - offset * 86400000).toISOString().slice(0, 10);
+      days.push({ date, tokens: merged.get(date) || 0 });
+    }
+    snapshot.usageHistory[name] = days;
   }
 }
 

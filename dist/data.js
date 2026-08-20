@@ -1,21 +1,24 @@
 window.DASH_DATA = {
-  "updatedAt": "2026-08-20T13:09:32.688+08:00",
+  "updatedAt": "2026-08-20T13:38:03.619+08:00",
   "sources": {
     "codex": {
       "ok": false,
       "label": "Codex",
       "windows": [],
-      "fetchedAt": "2026-08-20T13:09:32.561+08:00",
+      "fetchedAt": "2026-08-20T13:38:02.324+08:00",
       "error": "file:///C:/Users/XIAOFEI/AppData/Roaming/npm/node_modules/@openai/codex/bin/codex.js:105\r\n  throw new Error(\r\n        ^\r\n\r\nError: Missing optional dependency @openai/codex-win32-x64. Reinstall Codex: npm install -g @openai/codex@latest\r\n   "
     },
     "deepseek": {
-      "ok": false,
+      "ok": true,
       "label": "DeepSeek",
-      "balance": null,
+      "balance": 44.17,
       "currency": "CNY",
-      "detail": null,
-      "fetchedAt": "2026-08-20T13:09:32.576+08:00",
-      "error": "没有设置环境变量 DEEPSEEK_API_KEY"
+      "detail": "余额 ¥44.17",
+      "usage": {
+        "daily": []
+      },
+      "fetchedAt": "2026-08-20T13:38:02.344+08:00",
+      "error": null
     }
   },
   "usageHistory": {

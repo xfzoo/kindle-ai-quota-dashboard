@@ -1,0 +1,8 @@
+{
+  "items": [{
+    "name": "AI Quota Dashboard",
+    "priority": 20,
+    "action": "/mnt/us/extensions/ai-quota-dashboard/bin/start.sh",
+    "exitmenu": true
+  }]
+}

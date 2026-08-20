@@ -12,6 +12,7 @@ if [ ! -x /usr/bin/chromium/bin/kindle_browser ]; then
   done
   ls -l /usr/bin 2>&1 | grep -Ei 'browser|chrome|chromium|webkit|mesquite' || true
   restore_native() {
+    [ -n "$native_pid" ] && kill "$native_pid" >/dev/null 2>&1 || true
     lipc-set-prop com.lab126.powerd preventScreenSaver 0 >/dev/null 2>&1 || true
     if [ -d /etc/upstart ]; then
       status lab126_gui 2>/dev/null | grep -q running || start lab126_gui >/dev/null 2>&1 || true
@@ -36,11 +37,10 @@ if [ ! -x /usr/bin/chromium/bin/kindle_browser ]; then
   refresh_native
   trap restore_native EXIT INT TERM
   lipc-set-prop com.lab126.powerd preventScreenSaver 1 >/dev/null 2>&1 || true
-  echo "starting native browser"
-  lipc-set-prop com.lab126.appmgrd start app://com.lab126.browser 2>&1 || true
-  sleep 3
-  lipc-set-prop com.lab126.appmgrd start "app://com.lab126.browser#going?url=$URL" 2>&1 || true
-  lipc-set-prop com.lab126.browser gotoURL "$URL" 2>&1 || true
+  echo "starting native mesquite browser"
+  nohup /usr/bin/mesquite "$URL" >/dev/null 2>&1 &
+  native_pid=$!
+  echo "native_pid=$native_pid"
   echo "native browser requested"
   lipc-wait-event com.lab126.powerd PowerButtonQuickPress 2>&1 || true
   exit 0

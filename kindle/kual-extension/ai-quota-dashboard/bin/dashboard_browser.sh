@@ -3,7 +3,29 @@
 URL="$1"
 [ -n "$URL" ] || exit 1
 echo "url=$URL"
-command -v /usr/bin/chromium/bin/kindle_browser || { echo "kindle_browser missing"; exit 2; }
+if [ ! -x /usr/bin/chromium/bin/kindle_browser ]; then
+  echo "kindle_browser missing"
+  echo "uname=$(uname -a 2>&1)"
+  echo "version=$(cat /etc/version 2>&1)"
+  for candidate in /usr/bin/kindle_browser /usr/bin/chromium /usr/bin/chromium/bin/kindle_browser /usr/bin/mesquite /usr/bin/webkit /usr/local/bin/kindle_browser; do
+    ls -l "$candidate" 2>&1
+  done
+  ls -l /usr/bin 2>&1 | grep -Ei 'browser|chrome|chromium|webkit|mesquite' || true
+  restore_native() {
+    lipc-set-prop com.lab126.powerd preventScreenSaver 0 >/dev/null 2>&1 || true
+    lipc-set-prop com.lab126.appmgrd start app://com.lab126.booklet.home >/dev/null 2>&1 || true
+    eips -c >/dev/null 2>&1 || true
+  }
+  trap restore_native EXIT INT TERM
+  lipc-set-prop com.lab126.powerd preventScreenSaver 1 >/dev/null 2>&1 || true
+  echo "starting native browser"
+  lipc-set-prop com.lab126.appmgrd start app://com.lab126.browser 2>&1 || true
+  sleep 3
+  lipc-set-prop com.lab126.browser gotoURL "$URL" 2>&1 || true
+  echo "native browser requested"
+  lipc-wait-event com.lab126.powerd PowerButtonQuickPress 2>&1 || true
+  exit 0
+fi
 
 refresh_screen() {
   eips -c >/dev/null 2>&1

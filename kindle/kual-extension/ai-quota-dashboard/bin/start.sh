@@ -4,4 +4,4 @@ exec >>"$LOG" 2>&1
 echo "--- $(date) launch ---"
 BASE="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 echo "base=$BASE"
-exec /bin/bash "$BASE/bin/dashboard_browser.sh" "https://xfzoo.github.io/kindle-ai-quota-dashboard/"
+exec /bin/bash "$BASE/bin/dashboard_browser.sh" "https://xfzoo.github.io/kindle-ai-quota-dashboard/?v=20260820-4"

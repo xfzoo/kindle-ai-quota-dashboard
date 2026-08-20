@@ -2,6 +2,8 @@
 
 URL="$1"
 [ -n "$URL" ] || exit 1
+echo "url=$URL"
+command -v /usr/bin/chromium/bin/kindle_browser || { echo "kindle_browser missing"; exit 2; }
 
 refresh_screen() {
   eips -c >/dev/null 2>&1
@@ -48,6 +50,7 @@ nohup /usr/bin/chromium/bin/kindle_browser "$URL" --no-zygote --no-sandbox --sin
   >/dev/null 2>&1 &
 
 browser_pid=$!
+echo "browser_pid=$browser_pid"
 unset LD_LIBRARY_PATH
 STOP_FLAG="/tmp/kindle-ai-quota-stop.$$"
 rm -f "$STOP_FLAG"
